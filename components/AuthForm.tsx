@@ -1,12 +1,10 @@
 "use client";
 
 import { z } from "zod";
-import Link from "next/link";
-import Image from "next/image";
-import { FC, useState } from "react";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -16,16 +14,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { createAccount } from "@/lib/actions/user.actions";
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { createAccount, signInUser } from "@/lib/actions/user.actions";
+import OtpModal from "@/components/OTPModal";
 
-import OTPModal from "./OTPModal";
+type FormType = "sign-in" | "sign-up";
 
-type FormType = {
-  type: "sign-in" | "sign-up";
-};
-
-const authFormSchema = (formType: FormType["type"]) => {
+const authFormSchema = (formType: FormType) => {
   return z.object({
     email: z.string().email(),
     fullName:
@@ -35,16 +32,12 @@ const authFormSchema = (formType: FormType["type"]) => {
   });
 };
 
-const AuthForm: FC<FormType> = ({ type }) => {
-  const [isLoading, setisLoading] = useState(false);
+const AuthForm = ({ type }: { type: FormType }) => {
+  const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [accountId, setAccountId] = useState(null);
 
-  const formSchema = z.object({
-    fullName: z.string().min(2).max(50),
-    email: z.string().email(),
-  });
-
+  const formSchema = authFormSchema(type);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -54,32 +47,30 @@ const AuthForm: FC<FormType> = ({ type }) => {
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setisLoading(true);
+    setIsLoading(true);
     setErrorMessage("");
 
-    console.log(values)
-
     try {
-      const user = await createAccount({
-        fullName: values.fullName || "",
-        email: values.email,
-      });
+      const user =
+        type === "sign-up"
+          ? await createAccount({
+              fullName: values.fullName || "",
+              email: values.email,
+            })
+          : await signInUser({ email: values.email });
 
       setAccountId(user.accountId);
-    } catch (error) {
-      setErrorMessage("Failed to create account. Please try again");
+    } catch {
+      setErrorMessage("Failed to create account. Please try again.");
     } finally {
-      setisLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
     <>
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="w-full max-w-[580px] space-y-8"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="auth-form">
           <h1 className="form-title">
             {type === "sign-in" ? "Sign In" : "Sign Up"}
           </h1>
@@ -90,7 +81,7 @@ const AuthForm: FC<FormType> = ({ type }) => {
               render={({ field }) => (
                 <FormItem>
                   <div className="shad-form-item">
-                    <FormLabel className="shad-form-label">Full name</FormLabel>
+                    <FormLabel className="shad-form-label">Full Name</FormLabel>
 
                     <FormControl>
                       <Input
@@ -100,6 +91,7 @@ const AuthForm: FC<FormType> = ({ type }) => {
                       />
                     </FormControl>
                   </div>
+
                   <FormMessage className="shad-form-message" />
                 </FormItem>
               )}
@@ -122,16 +114,19 @@ const AuthForm: FC<FormType> = ({ type }) => {
                     />
                   </FormControl>
                 </div>
+
                 <FormMessage className="shad-form-message" />
               </FormItem>
             )}
           />
+
           <Button
             type="submit"
-            className="form-submit-button w-full"
+            className="form-submit-button"
             disabled={isLoading}
           >
             {type === "sign-in" ? "Sign In" : "Sign Up"}
+
             {isLoading && (
               <Image
                 src="/assets/icons/loader.svg"
@@ -155,15 +150,15 @@ const AuthForm: FC<FormType> = ({ type }) => {
               href={type === "sign-in" ? "/sign-up" : "/sign-in"}
               className="ml-1 font-medium text-brand"
             >
+              {" "}
               {type === "sign-in" ? "Sign Up" : "Sign In"}
             </Link>
           </div>
         </form>
       </Form>
-      {/* OTP Verification */}
 
       {accountId && (
-        <OTPModal email={form.getValues("email")} accountId={accountId} />
+        <OtpModal email={form.getValues("email")} accountId={accountId} />
       )}
     </>
   );
