@@ -2,10 +2,11 @@
 
 import { ID, Query } from "node-appwrite";
 
-import { parseStringfy } from "../utils";
-import { createAdminClient } from "../appwrite";
+import { parseStringify } from "../utils";
+import { createAdminClient, createSessionClient } from "../appwrite";
 import { appwriteConfig } from "../appwrite/config";
 import { cookies } from "next/headers";
+import { avatarPlaceholderUrl } from "@/constants";
 
 // **Creating account flow**
 // 1. User enters full name and email
@@ -68,14 +69,13 @@ export const createAccount = async ({
       {
         fullName: fullName,
         email,
-        avatar:
-          "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSrCLHZeA--7ckaEIUPD-Z0XASJ5BxYQYLsdA&s",
+        avatar: avatarPlaceholderUrl,
         accountId,
       }
     );
   }
 
-  return parseStringfy({ accountId });
+  return parseStringify({ accountId });
 };
 
 export const verifySecret = async ({
@@ -100,5 +100,26 @@ export const verifySecret = async ({
     return { sessionId: session.$id };
   } catch (error) {
     handleError(error, "Failed to verify OTP");
+  }
+};
+
+export const getCurrentUser = async () => {
+  try {
+    const { account } = await createSessionClient();
+    const result = await account.get();
+
+    const { databases } = await createAdminClient();
+    const user = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.usersCollectionId,
+      [Query.equal("accountId", result.$id)]
+    );
+
+    if (user.total <= 0) return null;
+
+    return parseStringify(user.documents[0]);
+  } catch (error) {
+    console.log("Error getting current user:", error);
+    return null;
   }
 };
